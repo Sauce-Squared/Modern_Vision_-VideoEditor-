@@ -12,11 +12,11 @@ Usage:
 """
 
 import argparse
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
-from datetime import datetime
 from pathlib import Path
 
 PHOTO_FOLDER_NAME = "modern_vision_photos"
@@ -67,6 +67,13 @@ def collect_photos(folder, count):
     # Keep the newest ones, then play them oldest to newest.
     photos.sort(key=lambda p: (added_time(p), p.name.lower()))
     return photos[-count:]
+
+
+def next_video_path(folder):
+    # Number videos modern_vision_tiktok1, 2, 3... one above the highest so far.
+    numbers = [int(m.group(1)) for p in folder.glob("modern_vision_tiktok*.mp4")
+               if (m := re.fullmatch(r"modern_vision_tiktok(\d+)\.mp4", p.name))]
+    return folder / f"modern_vision_tiktok{max(numbers, default=0) + 1}.mp4"
 
 
 def make_video(photos, output_path, loops, ffmpeg):
@@ -141,7 +148,7 @@ def main():
 
     output_folder = Path(args.output).expanduser()
     output_folder.mkdir(parents=True, exist_ok=True)
-    output_path = output_folder / f"modern_vision_{datetime.now():%Y-%m-%d_%H-%M-%S}.mp4"
+    output_path = next_video_path(output_folder)
 
     print("Photo order (oldest to newest):")
     for i, photo in enumerate(photos, 1):
