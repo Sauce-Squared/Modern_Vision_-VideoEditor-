@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Modern Vision slideshow maker.
 
-Takes the photos in a folder, shows each one for exactly 0.2 seconds in
-filename order, plays the whole set 4 times, and saves a TikTok-ready
+Takes the 10 newest photos in a folder, shows each one for exactly 0.2
+seconds in the order they were added, plays the whole set 4 times, and saves a TikTok-ready
 vertical video (1080x1920, 30 fps, H.264 MP4) into the
 "finished modern_vision_ videos" folder.
 
@@ -12,7 +12,6 @@ Usage:
 """
 
 import argparse
-import re
 import shutil
 import subprocess
 import sys
@@ -20,7 +19,7 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
-PHOTO_FOLDER_NAME = "modern_vision_ photos"
+PHOTO_FOLDER_NAME = "modern_vision_photos"
 OUTPUT_FOLDER_NAME = "finished modern_vision_ videos"
 PHOTO_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".tif", ".tiff"}
 
@@ -54,17 +53,20 @@ def find_ffmpeg():
         )
 
 
-def natural_key(path):
-    # Sort "photo2" before "photo10", the way a person would.
-    return [int(part) if part.isdigit() else part.lower()
-            for part in re.split(r"(\d+)", path.name)]
+def added_time(path):
+    # When the photo landed in the folder. A download sets the modified
+    # time; moving a file in updates the change time. Use whichever is later.
+    stat = path.stat()
+    return max(stat.st_mtime, stat.st_ctime)
 
 
-def collect_photos(folder):
+def collect_photos(folder, count):
     photos = [p for p in folder.iterdir()
               if p.is_file() and p.suffix.lower() in PHOTO_EXTENSIONS
               and not p.name.startswith(".")]
-    return sorted(photos, key=natural_key)
+    # Keep the newest ones, then play them oldest to newest.
+    photos.sort(key=lambda p: (added_time(p), p.name.lower()))
+    return photos[-count:]
 
 
 def make_video(photos, output_path, loops, ffmpeg):
@@ -120,6 +122,8 @@ def main():
                         help=f'folder of photos (default: "{PHOTO_FOLDER_NAME}" on your Desktop)')
     parser.add_argument("--output", default=str(desktop / OUTPUT_FOLDER_NAME),
                         help=f'where to save the video (default: "{OUTPUT_FOLDER_NAME}" on your Desktop)')
+    parser.add_argument("--count", type=int, default=EXPECTED_PHOTOS,
+                        help=f"how many of the newest photos to use (default: {EXPECTED_PHOTOS})")
     parser.add_argument("--loops", type=int, default=DEFAULT_LOOPS,
                         help=f"how many times to play the whole set (default: {DEFAULT_LOOPS})")
     args = parser.parse_args()
@@ -129,17 +133,17 @@ def main():
         photo_folder.mkdir(parents=True, exist_ok=True)
         sys.exit(f'I made the folder "{photo_folder}" for you. Put your photos in it and run me again.')
 
-    photos = collect_photos(photo_folder)
+    photos = collect_photos(photo_folder, args.count)
     if not photos:
         sys.exit(f'No photos found in "{photo_folder}". Add some and run me again.')
-    if len(photos) != EXPECTED_PHOTOS:
-        print(f"Heads up: found {len(photos)} photos (expected {EXPECTED_PHOTOS}). Using all of them.")
+    if len(photos) < args.count:
+        print(f"Heads up: only found {len(photos)} photos (wanted {args.count}). Using all of them.")
 
     output_folder = Path(args.output).expanduser()
     output_folder.mkdir(parents=True, exist_ok=True)
     output_path = output_folder / f"modern_vision_{datetime.now():%Y-%m-%d_%H-%M-%S}.mp4"
 
-    print("Photo order:")
+    print("Photo order (oldest to newest):")
     for i, photo in enumerate(photos, 1):
         print(f"  {i}. {photo.name}")
 
