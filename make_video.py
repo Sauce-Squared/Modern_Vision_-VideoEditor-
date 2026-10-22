@@ -76,6 +76,11 @@ def next_video_path(folder):
     return folder / f"modern_vision_tiktok{max(numbers, default=0) + 1}.mp4"
 
 
+def newest_video_time(folder):
+    times = [p.stat().st_mtime for p in folder.glob("modern_vision_*.mp4")]
+    return max(times, default=None)
+
+
 def make_video(photos, output_path, loops, ffmpeg):
     fit = (
         f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,"
@@ -131,6 +136,8 @@ def main():
                         help=f'where to save the video (default: "{OUTPUT_FOLDER_NAME}" on your Desktop)')
     parser.add_argument("--count", type=int, default=EXPECTED_PHOTOS,
                         help=f"how many of the newest photos to use (default: {EXPECTED_PHOTOS})")
+    parser.add_argument("--allow-repeat", action="store_true",
+                        help="make a video even if no new photos were added")
     parser.add_argument("--loops", type=int, default=DEFAULT_LOOPS,
                         help=f"how many times to play the whole set (default: {DEFAULT_LOOPS})")
     args = parser.parse_args()
@@ -148,6 +155,12 @@ def main():
 
     output_folder = Path(args.output).expanduser()
     output_folder.mkdir(parents=True, exist_ok=True)
+
+    # Don't make a repeat: stop if no photo was added since the last video.
+    last_video = newest_video_time(output_folder)
+    if last_video is not None and not args.allow_repeat and max(added_time(p) for p in photos) <= last_video:
+        sys.exit("You have not added new photos yet")
+
     output_path = next_video_path(output_folder)
 
     print("Photo order (oldest to newest):")
