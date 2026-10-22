@@ -12,6 +12,7 @@ Usage:
 """
 
 import argparse
+import hashlib
 import re
 import shutil
 import subprocess
@@ -64,9 +65,19 @@ def collect_photos(folder, count):
     photos = [p for p in folder.iterdir()
               if p.is_file() and p.suffix.lower() in PHOTO_EXTENSIONS
               and not p.name.startswith(".")]
-    # Keep the newest ones, then play them oldest to newest.
-    photos.sort(key=lambda p: (added_time(p), p.name.lower()))
-    return photos[-count:]
+    # Keep the newest ones, then play them oldest to newest. Skip exact
+    # duplicates (the same photo downloaded twice) so none shows twice.
+    photos.sort(key=lambda p: (added_time(p), p.name.lower()), reverse=True)
+    chosen, seen = [], set()
+    for photo in photos:
+        digest = hashlib.sha256(photo.read_bytes()).hexdigest()
+        if digest in seen:
+            continue
+        seen.add(digest)
+        chosen.append(photo)
+        if len(chosen) == count:
+            break
+    return chosen[::-1]
 
 
 def next_video_path(folder):

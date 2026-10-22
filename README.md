@@ -27,6 +27,7 @@ Turns a folder of photos into a TikTok-ready slideshow video.
 1. Make a folder on your Desktop called **`modern_vision_photos`** and drop your photos in. No renaming needed.
    - The tool picks the 10 most recently added photos and plays them in the order you added them.
    - Older photos can stay in the folder; they're just skipped.
+   - If the same photo got downloaded twice, the copy is skipped so it never shows twice.
    - JPG, PNG and WEBP all work.
 2. In the terminal, type `python3 ` (with a space after it), drag the `make_video.py` file into the terminal window, and press Enter.
 3. Your video appears in the **`finished modern_vision_ videos`** folder on your Desktop, ready to upload to TikTok.
